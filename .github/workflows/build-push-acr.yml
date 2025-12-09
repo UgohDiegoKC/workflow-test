@@ -51,32 +51,47 @@ jobs:
           # Get short commit SHA
           SHORT_SHA=$(echo ${{ github.sha }} | cut -c1-7)
           
-          # Determine tags based on branch/event
+          # Build tags array
+          TAGS_ARRAY=()
+          
+          # Determine base tags based on branch/event
           if [ "${{ github.event_name }}" == "pull_request" ]; then
             PR_NUMBER=${{ github.event.pull_request.number }}
-            TAGS="${{ env.ACR_NAME }}.azurecr.io/${{ env.IMAGE_NAME }}:pr-${PR_NUMBER}-${SHORT_SHA}"
+            TAGS_ARRAY+=("${{ env.ACR_NAME }}.azurecr.io/${{ env.IMAGE_NAME }}:pr-${PR_NUMBER}-${SHORT_SHA}")
           elif [ "${{ github.ref }}" == "refs/heads/main" ]; then
-            TAGS="${{ env.ACR_NAME }}.azurecr.io/${{ env.IMAGE_NAME }}:latest ${{ env.ACR_NAME }}.azurecr.io/${{ env.IMAGE_NAME }}:main-${SHORT_SHA}"
+            TAGS_ARRAY+=("${{ env.ACR_NAME }}.azurecr.io/${{ env.IMAGE_NAME }}:latest")
+            TAGS_ARRAY+=("${{ env.ACR_NAME }}.azurecr.io/${{ env.IMAGE_NAME }}:main-${SHORT_SHA}")
           elif [ "${{ github.ref }}" == "refs/heads/develop" ]; then
-            TAGS="${{ env.ACR_NAME }}.azurecr.io/${{ env.IMAGE_NAME }}:develop ${{ env.ACR_NAME }}.azurecr.io/${{ env.IMAGE_NAME }}:develop-${SHORT_SHA}"
+            TAGS_ARRAY+=("${{ env.ACR_NAME }}.azurecr.io/${{ env.IMAGE_NAME }}:develop")
+            TAGS_ARRAY+=("${{ env.ACR_NAME }}.azurecr.io/${{ env.IMAGE_NAME }}:develop-${SHORT_SHA}")
           else
             BRANCH_NAME=$(echo ${{ github.ref }} | sed 's/refs\/heads\///' | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]/-/g')
-            TAGS="${{ env.ACR_NAME }}.azurecr.io/${{ env.IMAGE_NAME }}:${BRANCH_NAME}-${SHORT_SHA}"
+            TAGS_ARRAY+=("${{ env.ACR_NAME }}.azurecr.io/${{ env.IMAGE_NAME }}:${BRANCH_NAME}-${SHORT_SHA}")
           fi
           
           # Add custom tag if provided via workflow_dispatch
           if [ -n "${{ github.event.inputs.tag }}" ]; then
-            TAGS="${TAGS} ${{ env.ACR_NAME }}.azurecr.io/${{ env.IMAGE_NAME }}:${{ github.event.inputs.tag }}"
+            TAGS_ARRAY+=("${{ env.ACR_NAME }}.azurecr.io/${{ env.IMAGE_NAME }}:${{ github.event.inputs.tag }}")
           fi
           
           # Add version tag if package.json version exists
           VERSION=$(node -p "require('./package.json').version" 2>/dev/null || echo "")
           if [ -n "$VERSION" ] && [ "$VERSION" != "0.0.0" ]; then
-            TAGS="${TAGS} ${{ env.ACR_NAME }}.azurecr.io/${{ env.IMAGE_NAME }}:v${VERSION}"
+            TAGS_ARRAY+=("${{ env.ACR_NAME }}.azurecr.io/${{ env.IMAGE_NAME }}:v${VERSION}")
           fi
           
-          echo "tags=${TAGS}" >> $GITHUB_OUTPUT
-          echo "Generated tags: ${TAGS}"
+          # Output tags as multi-line string (one tag per line) for docker/build-push-action
+          {
+            echo "tags<<EOF"
+            for tag in "${TAGS_ARRAY[@]}"; do
+              echo "$tag"
+            done
+            echo "EOF"
+          } >> $GITHUB_OUTPUT
+          
+          # Display tags for logging
+          TAGS_DISPLAY=$(IFS=' '; echo "${TAGS_ARRAY[*]}")
+          echo "Generated tags: ${TAGS_DISPLAY}"
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
