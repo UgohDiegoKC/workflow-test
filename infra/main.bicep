@@ -75,13 +75,21 @@ module containerAppModule 'modules/container-app.bicep' = {
   }
 }
 
+// Reference to existing ACR resource group
+resource acrRg 'Microsoft.Resources/resourceGroups@2021-04-01' existing = {
+  name: acrResourceGroupName
+}
+
+// Reference to existing ACR
+resource acr 'Microsoft.ContainerRegistry/registries@2023-07-01' existing = {
+  name: acrName
+  scope: acrRg
+}
+
 // Role assignment: AcrPull role for the managed identity on ACR
 resource acrPullRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(containerAppRg.id, containerAppModule.outputs.containerAppIdentityId, 'AcrPull')
-  scope: resourceId(acrResourceGroupName, 'Microsoft.ContainerRegistry/registries', acrName)
-  dependsOn: [
-    containerAppModule
-  ]
+  name: guid(containerAppRg.id, containerAppName, 'AcrPull')
+  scope: acr
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '7f951dda-4ed3-4680-a7ca-43b172e22efd') // AcrPull
     principalId: containerAppModule.outputs.containerAppIdentityPrincipalId
