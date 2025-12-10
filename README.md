@@ -32,7 +32,7 @@ The infrastructure is deployed at **subscription level** and creates the followi
 - `rg-capp-test` - Container App resources
 
 #### Resources Created:
-- **Virtual Network** (`vnet-cae-test`) with a `/23` subnet (`10.0.1.0/23`) for Container Apps
+- **Virtual Network** (`vnet-cae-test`) with a `/23` subnet (`10.0.0.0/23`) for Container Apps
 - **Container App Environment** (`cae-test`) with **internal VNet integration** (VNet-only access)
 - **Container App** (`capp-test`) configured to use the image from ACR
 - **Log Analytics Workspace** for monitoring
