@@ -48,143 +48,51 @@ resource containerAppRg 'Microsoft.Resources/resourceGroups@2021-04-01' = {
   location: location
 }
 
-// Virtual Network (deployed to Container App Environment resource group)
-resource vnet 'Microsoft.Network/virtualNetworks@2023-05-01' = {
-  name: 'vnet-${containerAppEnvironmentName}'
-  location: location
+// Deploy Container App Environment resources using module
+module containerAppEnvironmentModule 'modules/container-app-environment.bicep' = {
+  name: 'containerAppEnvironmentDeployment'
   scope: containerAppEnvironmentRg
-  properties: {
-    addressSpace: {
-      addressPrefixes: [
-        vnetAddressPrefix
-      ]
-    }
-    subnets: [
-      {
-        name: 'subnet-containerapps'
-        properties: {
-          addressPrefix: containerAppsSubnetAddressPrefix
-          delegations: [
-            {
-              name: 'Microsoft.App/environments'
-              properties: {
-                serviceName: 'Microsoft.App/environments'
-              }
-            }
-          ]
-        }
-      }
-    ]
+  params: {
+    location: location
+    containerAppEnvironmentName: containerAppEnvironmentName
+    vnetAddressPrefix: vnetAddressPrefix
+    containerAppsSubnetAddressPrefix: containerAppsSubnetAddressPrefix
   }
 }
 
-// Subnet reference for Container App Environment
-resource containerAppsSubnet 'Microsoft.Network/virtualNetworks/subnets@2023-05-01' existing = {
-  name: 'subnet-containerapps'
-  parent: vnet
-}
-
-// Log Analytics Workspace for Container App Environment (deployed to Container App Environment resource group)
-resource logAnalyticsWorkspace 'Microsoft.OperationalInsights/workspaces@2023-09-01' = {
-  name: 'law-${containerAppEnvironmentName}'
-  location: location
-  scope: containerAppEnvironmentRg
-  properties: {
-    sku: {
-      name: 'PerGB2018'
-    }
-    retentionInDays: 30
-  }
-}
-
-// Container App Environment with VNet integration (deployed to Container App Environment resource group)
-resource containerAppEnvironment 'Microsoft.App/managedEnvironments@2023-05-01' = {
-  name: containerAppEnvironmentName
-  location: location
-  scope: containerAppEnvironmentRg
-  properties: {
-    appLogsConfiguration: {
-      destination: 'log-analytics'
-      logAnalyticsConfiguration: {
-        customerId: logAnalyticsWorkspace.properties.customerId
-      }
-    }
-    vnetConfiguration: {
-      infrastructureSubnetId: containerAppsSubnet.id
-      internal: true
-    }
-  }
-}
-
-// User-assigned managed identity for Container App (deployed to Container App resource group)
-resource containerAppIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31' = {
-  name: 'identity-${containerAppName}'
-  location: location
+// Deploy Container App resources using module
+module containerAppModule 'modules/container-app.bicep' = {
+  name: 'containerAppDeployment'
   scope: containerAppRg
+  params: {
+    location: location
+    containerAppName: containerAppName
+    containerAppEnvironmentId: containerAppEnvironmentModule.outputs.containerAppEnvironmentId
+    acrName: acrName
+    imageName: imageName
+    imageTag: imageTag
+    containerPort: containerPort
+  }
 }
 
 // Role assignment: AcrPull role for the managed identity on ACR
 resource acrPullRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(containerAppRg.id, containerAppIdentity.id, 'AcrPull')
+  name: guid(containerAppRg.id, containerAppModule.outputs.containerAppIdentityId, 'AcrPull')
   scope: resourceId(acrResourceGroupName, 'Microsoft.ContainerRegistry/registries', acrName)
+  dependsOn: [
+    containerAppModule
+  ]
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '7f951dda-4ed3-4680-a7ca-43b172e22efd') // AcrPull
-    principalId: containerAppIdentity.properties.principalId
+    principalId: containerAppModule.outputs.containerAppIdentityPrincipalId
     principalType: 'ServicePrincipal'
   }
 }
 
-// Container App (deployed to Container App resource group)
-resource containerApp 'Microsoft.App/containerApps@2023-05-01' = {
-  name: containerAppName
-  location: location
-  scope: containerAppRg
-  identity: {
-    type: 'UserAssigned'
-    userAssignedIdentities: {
-      '${containerAppIdentity.id}': {}
-    }
-  }
-  properties: {
-    managedEnvironmentId: containerAppEnvironment.id
-    configuration: {
-      ingress: {
-        external: false
-        targetPort: containerPort
-        allowInsecure: false
-        transport: 'auto'
-      }
-      registries: [
-        {
-          server: '${acrName}.azurecr.io'
-          identity: containerAppIdentity.id
-        }
-      ]
-    }
-    template: {
-      containers: [
-        {
-          name: containerAppName
-          image: '${acrName}.azurecr.io/${imageName}:${imageTag}'
-          resources: {
-            cpu: json('0.25')
-            memory: '0.5Gi'
-          }
-          env: []
-        }
-      ]
-      scale: {
-        minReplicas: 1
-        maxReplicas: 3
-      }
-    }
-  }
-}
-
 // Outputs
-output containerAppEnvironmentName string = containerAppEnvironment.name
-output containerAppName string = containerApp.name
-output containerAppFqdn string = containerApp.properties.configuration.ingress.fqdn
-output containerAppUrl string = 'https://${containerApp.properties.configuration.ingress.fqdn}'
-output vnetName string = vnet.name
-output containerAppIdentityId string = containerAppIdentity.id
+output containerAppEnvironmentName string = containerAppEnvironmentModule.outputs.containerAppEnvironmentName
+output containerAppName string = containerAppModule.outputs.containerAppName
+output containerAppFqdn string = containerAppModule.outputs.containerAppFqdn
+output containerAppUrl string = 'https://${containerAppModule.outputs.containerAppFqdn}'
+output vnetName string = containerAppEnvironmentModule.outputs.vnetName
+output containerAppIdentityId string = containerAppModule.outputs.containerAppIdentityId
