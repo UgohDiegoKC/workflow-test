@@ -80,20 +80,14 @@ resource acrRg 'Microsoft.Resources/resourceGroups@2021-04-01' existing = {
   name: acrResourceGroupName
 }
 
-// Reference to existing ACR
-resource acr 'Microsoft.ContainerRegistry/registries@2023-07-01' existing = {
-  name: acrName
+// Role assignment: AcrPull role for the managed identity on ACR (deployed via module)
+module acrRoleAssignmentModule 'modules/acr-role-assignment.bicep' = {
+  name: 'acrRoleAssignmentDeployment'
   scope: acrRg
-}
-
-// Role assignment: AcrPull role for the managed identity on ACR
-resource acrPullRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(containerAppRg.id, containerAppName, 'AcrPull')
-  scope: acr
-  properties: {
-    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '7f951dda-4ed3-4680-a7ca-43b172e22efd') // AcrPull
+  params: {
+    acrName: acrName
     principalId: containerAppModule.outputs.containerAppIdentityPrincipalId
-    principalType: 'ServicePrincipal'
+    roleAssignmentNameSeed: '${containerAppRg.id}-${containerAppName}'
   }
 }
 
