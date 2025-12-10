@@ -1,10 +1,22 @@
 targetScope = 'subscription'
 
-@description('The name of the resource group for the Container App Environment')
-param containerAppEnvironmentResourceGroupName string
+@description('The name of the resource group where the VNet is located')
+param vnetResourceGroupName string
 
-@description('The name of the resource group for the Container App')
-param containerAppResourceGroupName string
+@description('The name of the Virtual Network')
+param vnetName string
+
+@description('The name of the subnet for Container Apps')
+param subnetName string
+
+@description('The name of the resource group where the Log Analytics Workspace is located')
+param logAnalyticsResourceGroupName string
+
+@description('The name of the Log Analytics Workspace')
+param logAnalyticsWorkspaceName string
+
+@description('The name of the resource group for the Container App Environment and Container App')
+param containerAppEnvironmentResourceGroupName string
 
 @description('The location for all resources')
 param location string
@@ -30,40 +42,30 @@ param imageTag string
 @description('The port the container listens on')
 param containerPort int
 
-@description('The VNet address prefix')
-param vnetAddressPrefix string
-
-@description('The subnet address prefix for Container Apps')
-param containerAppsSubnetAddressPrefix string
-
-// Resource Group for Container App Environment
-resource containerAppEnvironmentRg 'Microsoft.Resources/resourceGroups@2021-04-01' = {
+// Reference to existing Container App Environment and Container App resource group
+resource containerAppEnvironmentRg 'Microsoft.Resources/resourceGroups@2021-04-01' existing = {
   name: containerAppEnvironmentResourceGroupName
-  location: location
 }
 
-// Resource Group for Container App
-resource containerAppRg 'Microsoft.Resources/resourceGroups@2021-04-01' = {
-  name: containerAppResourceGroupName
-  location: location
-}
-
-// Deploy Container App Environment resources using module
+// Reference existing Container App Environment resources using module
 module containerAppEnvironmentModule 'modules/container-app-environment.bicep' = {
   name: 'containerAppEnvironmentDeployment'
   scope: containerAppEnvironmentRg
   params: {
-    location: location
+    vnetResourceGroupName: vnetResourceGroupName
+    vnetName: vnetName
+    subnetName: subnetName
+    logAnalyticsResourceGroupName: logAnalyticsResourceGroupName
+    logAnalyticsWorkspaceName: logAnalyticsWorkspaceName
+    containerAppEnvironmentResourceGroupName: containerAppEnvironmentResourceGroupName
     containerAppEnvironmentName: containerAppEnvironmentName
-    vnetAddressPrefix: vnetAddressPrefix
-    containerAppsSubnetAddressPrefix: containerAppsSubnetAddressPrefix
   }
 }
 
 // Deploy Container App resources using module
 module containerAppModule 'modules/container-app.bicep' = {
   name: 'containerAppDeployment'
-  scope: containerAppRg
+  scope: containerAppEnvironmentRg
   params: {
     location: location
     containerAppName: containerAppName
@@ -87,7 +89,7 @@ module acrRoleAssignmentModule 'modules/acr-role-assignment.bicep' = {
   params: {
     acrName: acrName
     principalId: containerAppModule.outputs.containerAppIdentityPrincipalId
-    roleAssignmentNameSeed: '${containerAppRg.id}-${containerAppName}'
+    roleAssignmentNameSeed: '${containerAppEnvironmentRg.id}-${containerAppName}'
   }
 }
 
@@ -95,6 +97,6 @@ module acrRoleAssignmentModule 'modules/acr-role-assignment.bicep' = {
 output containerAppEnvironmentName string = containerAppEnvironmentModule.outputs.containerAppEnvironmentName
 output containerAppName string = containerAppModule.outputs.containerAppName
 output containerAppFqdn string = containerAppModule.outputs.containerAppFqdn
-output containerAppUrl string = 'https://${containerAppModule.outputs.containerAppFqdn}'
+output containerAppUrl string = containerAppModule.outputs.containerAppFqdn != '' ? 'https://${containerAppModule.outputs.containerAppFqdn}' : 'Internal endpoint (VNet-only)'
 output vnetName string = containerAppEnvironmentModule.outputs.vnetName
 output containerAppIdentityId string = containerAppModule.outputs.containerAppIdentityId

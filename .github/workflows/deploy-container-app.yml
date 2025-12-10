@@ -17,10 +17,14 @@ env:
   ACR_NAME: workflowtest
   ACR_RESOURCE_GROUP: workflowtest-rg
   IMAGE_NAME: workflow-test-app
-  CONTAINER_APP_ENV_RG: rg-cae-test
-  CONTAINER_APP_RG: rg-capp-test
+  VNET_RG: Vnet-RG
+  VNET_NAME: vnet-cae-test
+  SUBNET_NAME: subnet-containerapps
+  LAW_RG: Vnet-RG
+  LAW_NAME: law-cae-test
+  CONTAINER_APP_ENV_RG: workflowtest-rg
   CONTAINER_APP_ENV_NAME: cae-test
-  CONTAINER_APP_NAME: capp-test
+  CONTAINER_APP_NAME: capp-test-new
 
 permissions:
   contents: read
@@ -59,13 +63,17 @@ jobs:
             --location eastus \
             --template-file ./infra/main.bicep \
             --parameters @./infra/main.parameters.json \
+              vnetResourceGroupName=${{ env.VNET_RG }} \
+              vnetName=${{ env.VNET_NAME }} \
+              subnetName=${{ env.SUBNET_NAME }} \
+              logAnalyticsResourceGroupName=${{ env.LAW_RG }} \
+              logAnalyticsWorkspaceName=${{ env.LAW_NAME }} \
+              containerAppEnvironmentResourceGroupName=${{ env.CONTAINER_APP_ENV_RG }} \
+              containerAppEnvironmentName=${{ env.CONTAINER_APP_ENV_NAME }} \
               acrName=${{ env.ACR_NAME }} \
               acrResourceGroupName=${{ env.ACR_RESOURCE_GROUP }} \
               imageName=${{ env.IMAGE_NAME }} \
               imageTag=${{ steps.set-tag.outputs.tag }} \
-              containerAppEnvironmentResourceGroupName=${{ env.CONTAINER_APP_ENV_RG }} \
-              containerAppResourceGroupName=${{ env.CONTAINER_APP_RG }} \
-              containerAppEnvironmentName=${{ env.CONTAINER_APP_ENV_NAME }} \
               containerAppName=${{ env.CONTAINER_APP_NAME }}
 
       - name: Get Container App Internal URL
@@ -73,7 +81,7 @@ jobs:
         run: |
           APP_URL=$(az containerapp show \
             --name ${{ env.CONTAINER_APP_NAME }} \
-            --resource-group ${{ env.CONTAINER_APP_RG }} \
+            --resource-group ${{ env.CONTAINER_APP_ENV_RG }} \
             --query "properties.configuration.ingress.fqdn" \
             --output tsv)
           echo "url=${APP_URL}" >> $GITHUB_OUTPUT

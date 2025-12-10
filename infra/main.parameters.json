@@ -2,11 +2,23 @@
   "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
   "contentVersion": "1.0.0.0",
   "parameters": {
-    "containerAppEnvironmentResourceGroupName": {
-      "value": "rg-cae-test"
+    "vnetResourceGroupName": {
+      "value": "Vnet-RG"
     },
-    "containerAppResourceGroupName": {
-      "value": "rg-capp-test"
+    "vnetName": {
+      "value": "vnet-cae-test"
+    },
+    "subnetName": {
+      "value": "subnet-containerapps"
+    },
+    "logAnalyticsResourceGroupName": {
+      "value": "Vnet-RG"
+    },
+    "logAnalyticsWorkspaceName": {
+      "value": "law-cae-test"
+    },
+    "containerAppEnvironmentResourceGroupName": {
+      "value": "workflowtest-rg"
     },
     "location": {
       "value": "eastus"
@@ -15,7 +27,7 @@
       "value": "cae-test"
     },
     "containerAppName": {
-      "value": "capp-test"
+      "value": "capp-test-new"
     },
     "acrName": {
       "value": "workflowtest"
@@ -31,12 +43,6 @@
     },
     "containerPort": {
       "value": 3000
-    },
-    "vnetAddressPrefix": {
-      "value": "10.0.0.0/16"
-    },
-    "containerAppsSubnetAddressPrefix": {
-      "value": "10.0.0.0/23"
     }
   }
 }

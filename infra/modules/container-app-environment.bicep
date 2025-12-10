@@ -1,87 +1,63 @@
 targetScope = 'resourceGroup'
 
-@description('The location for all resources')
-param location string
+@description('The name of the resource group where the VNet is located')
+param vnetResourceGroupName string
+
+@description('The name of the Virtual Network')
+param vnetName string
+
+@description('The name of the subnet for Container Apps')
+param subnetName string
+
+@description('The name of the resource group where the Log Analytics Workspace is located')
+param logAnalyticsResourceGroupName string
+
+@description('The name of the Log Analytics Workspace')
+param logAnalyticsWorkspaceName string
+
+@description('The name of the resource group where the Container App Environment is located')
+param containerAppEnvironmentResourceGroupName string
 
 @description('The name of the Container App Environment')
 param containerAppEnvironmentName string
 
-@description('The VNet address prefix')
-param vnetAddressPrefix string
-
-@description('The subnet address prefix for Container Apps')
-param containerAppsSubnetAddressPrefix string
-
-// Virtual Network
-resource vnet 'Microsoft.Network/virtualNetworks@2023-05-01' = {
-  name: 'vnet-${containerAppEnvironmentName}'
-  location: location
-  properties: {
-    addressSpace: {
-      addressPrefixes: [
-        vnetAddressPrefix
-      ]
-    }
-    subnets: [
-      {
-        name: 'subnet-containerapps'
-        properties: {
-          addressPrefix: containerAppsSubnetAddressPrefix
-          delegations: [
-            {
-              name: 'Microsoft.App/environments'
-              properties: {
-                serviceName: 'Microsoft.App/environments'
-              }
-            }
-          ]
-        }
-      }
-    ]
-  }
+// Reference to existing VNet resource group
+resource vnetRg 'Microsoft.Resources/resourceGroups@2021-04-01' existing = {
+  name: vnetResourceGroupName
 }
 
-// Subnet reference for Container App Environment
+// Reference to existing Virtual Network
+resource vnet 'Microsoft.Network/virtualNetworks@2023-05-01' existing = {
+  name: vnetName
+  scope: vnetRg
+}
+
+// Reference to existing Subnet
 resource containerAppsSubnet 'Microsoft.Network/virtualNetworks/subnets@2023-05-01' existing = {
-  name: 'subnet-containerapps'
+  name: subnetName
   parent: vnet
 }
 
-// Log Analytics Workspace for Container App Environment
-resource logAnalyticsWorkspace 'Microsoft.OperationalInsights/workspaces@2023-09-01' = {
-  name: 'law-${containerAppEnvironmentName}'
-  location: location
-  properties: {
-    sku: {
-      name: 'PerGB2018'
-    }
-    retentionInDays: 30
-  }
+// Reference to existing Log Analytics Workspace resource group
+resource lawRg 'Microsoft.Resources/resourceGroups@2021-04-01' existing = {
+  name: logAnalyticsResourceGroupName
 }
 
-// Get Log Analytics workspace shared key using listKeys
-resource logAnalyticsWorkspaceKeys 'Microsoft.OperationalInsights/workspaces@2020-08-01/listKeys' = {
-  name: 'listKeys'
-  parent: logAnalyticsWorkspace
+// Reference to existing Log Analytics Workspace
+resource logAnalyticsWorkspace 'Microsoft.OperationalInsights/workspaces@2023-09-01' existing = {
+  name: logAnalyticsWorkspaceName
+  scope: lawRg
 }
 
-// Container App Environment with VNet integration
-resource containerAppEnvironment 'Microsoft.App/managedEnvironments@2023-05-01' = {
+// Reference to existing Container App Environment resource group
+resource caeRg 'Microsoft.Resources/resourceGroups@2021-04-01' existing = {
+  name: containerAppEnvironmentResourceGroupName
+}
+
+// Reference to existing Container App Environment
+resource containerAppEnvironment 'Microsoft.App/managedEnvironments@2023-05-01' existing = {
   name: containerAppEnvironmentName
-  location: location
-  properties: {
-    appLogsConfiguration: {
-      destination: 'log-analytics'
-      logAnalyticsConfiguration: {
-        customerId: logAnalyticsWorkspace.properties.customerId
-        sharedKey: logAnalyticsWorkspaceKeys.primarySharedKey
-      }
-    }
-    vnetConfiguration: {
-      infrastructureSubnetId: containerAppsSubnet.id
-      internal: true
-    }
-  }
+  scope: caeRg
 }
 
 // Outputs
