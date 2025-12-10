@@ -1,0 +1,91 @@
+name: Deploy Container App
+
+on:
+  workflow_run:
+    workflows: ["Build and Push to ACR"]
+    types:
+      - completed
+  workflow_dispatch:
+    inputs:
+      imageTag:
+        description: 'Image tag to deploy (defaults to latest)'
+        required: false
+        type: string
+        default: 'latest'
+
+env:
+  ACR_NAME: workflowtest
+  ACR_RESOURCE_GROUP: workflowtest-rg
+  IMAGE_NAME: workflow-test-app
+  CONTAINER_APP_ENV_RG: rg-cae-test
+  CONTAINER_APP_RG: rg-capp-test
+  CONTAINER_APP_ENV_NAME: cae-test
+  CONTAINER_APP_NAME: capp-test
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  deploy:
+    name: Deploy Container App
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' || github.event_name == 'workflow_dispatch' }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Log in to Azure
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Set image tag
+        id: set-tag
+        run: |
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ] && [ -n "${{ github.event.inputs.imageTag }}" ]; then
+            IMAGE_TAG="${{ github.event.inputs.imageTag }}"
+          else
+            # Get the latest tag from the workflow run
+            IMAGE_TAG="latest"
+          fi
+          echo "tag=${IMAGE_TAG}" >> $GITHUB_OUTPUT
+          echo "Deploying image tag: ${IMAGE_TAG}"
+
+      - name: Deploy Bicep template
+        run: |
+          az deployment sub create \
+            --location eastus \
+            --template-file ./infra/main.bicep \
+            --parameters @./infra/main.parameters.bicep \
+              acrName=${{ env.ACR_NAME }} \
+              acrResourceGroupName=${{ env.ACR_RESOURCE_GROUP }} \
+              imageName=${{ env.IMAGE_NAME }} \
+              imageTag=${{ steps.set-tag.outputs.tag }} \
+              containerAppEnvironmentResourceGroupName=${{ env.CONTAINER_APP_ENV_RG }} \
+              containerAppResourceGroupName=${{ env.CONTAINER_APP_RG }} \
+              containerAppEnvironmentName=${{ env.CONTAINER_APP_ENV_NAME }} \
+              containerAppName=${{ env.CONTAINER_APP_NAME }}
+
+      - name: Get Container App Internal URL
+        id: get-url
+        run: |
+          APP_URL=$(az containerapp show \
+            --name ${{ env.CONTAINER_APP_NAME }} \
+            --resource-group ${{ env.CONTAINER_APP_RG }} \
+            --query "properties.configuration.ingress.fqdn" \
+            --output tsv)
+          echo "url=${APP_URL}" >> $GITHUB_OUTPUT
+          echo "Container App Internal FQDN (VNet-only): ${APP_URL}"
+          echo "Note: This endpoint is only accessible from within the VNet"
+
+      - name: Deployment summary
+        run: |
+          echo "## 🚀 Container App Deployed Successfully" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Container App**: ${{ env.CONTAINER_APP_NAME }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Environment**: ${{ env.CONTAINER_APP_ENV_NAME }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Image**: ${{ env.ACR_NAME }}.azurecr.io/${{ env.IMAGE_NAME }}:${{ steps.set-tag.outputs.tag }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Internal FQDN**: ${{ steps.get-url.outputs.url }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Access**: VNet-only (internal endpoint)" >> $GITHUB_STEP_SUMMARY
