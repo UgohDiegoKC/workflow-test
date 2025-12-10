@@ -9,7 +9,7 @@ This is a minimal test application for testing the GitHub Actions workflow that 
 - `.github/workflows/build-push-acr.yml` - GitHub Actions workflow for building and pushing to ACR
 - `.github/workflows/deploy-container-app.yml` - GitHub Actions workflow for deploying to Container App
 - `infra/main.bicep` - Bicep template for infrastructure (VNet, Container App Environment, Container App)
-- `infra/main.parameters.bicep` - Bicep parameters file
+- `infra/main.parameters.json` - Bicep parameters file
 - `package.json` - Node.js dependencies
 
 ## Infrastructure Deployment
@@ -32,7 +32,7 @@ The infrastructure is deployed at **subscription level** and creates the followi
 - `rg-capp-test` - Container App resources
 
 #### Resources Created:
-- **Virtual Network** (`vnet-cae-test`) with a `/23` subnet (`10.0.0.0/23`) for Container Apps
+- **Virtual Network** (`vnet-cae-test`) with a `/23` subnet (`10.0.1.0/23`) for Container Apps
 - **Container App Environment** (`cae-test`) with **internal VNet integration** (VNet-only access)
 - **Container App** (`capp-test`) configured to use the image from ACR
 - **Log Analytics Workspace** for monitoring
@@ -46,7 +46,7 @@ The infrastructure can be deployed using Azure CLI:
 az deployment sub create \
   --location eastus \
   --template-file ./infra/main.bicep \
-  --parameters @./infra/main.parameters.bicep \
+  --parameters @./infra/main.parameters.json \
     acrName=workflowtest \
     acrResourceGroupName=workflowtest-rg \
     imageName=workflow-test-app \

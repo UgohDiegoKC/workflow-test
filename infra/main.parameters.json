@@ -1,0 +1,43 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "containerAppEnvironmentResourceGroupName": {
+      "value": "rg-cae-test"
+    },
+    "containerAppResourceGroupName": {
+      "value": "rg-capp-test"
+    },
+    "location": {
+      "value": "eastus"
+    },
+    "containerAppEnvironmentName": {
+      "value": "cae-test"
+    },
+    "containerAppName": {
+      "value": "capp-test"
+    },
+    "acrName": {
+      "value": "workflowtest"
+    },
+    "acrResourceGroupName": {
+      "value": "workflowtest-rg"
+    },
+    "imageName": {
+      "value": "workflow-test-app"
+    },
+    "imageTag": {
+      "value": "latest"
+    },
+    "containerPort": {
+      "value": 3000
+    },
+    "vnetAddressPrefix": {
+      "value": "10.0.0.0/16"
+    },
+    "containerAppsSubnetAddressPrefix": {
+      "value": "10.0.1.0/23"
+    }
+  }
+}
+

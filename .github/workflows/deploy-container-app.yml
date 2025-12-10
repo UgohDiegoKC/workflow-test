@@ -58,7 +58,7 @@ jobs:
           az deployment sub create \
             --location eastus \
             --template-file ./infra/main.bicep \
-            --parameters @./infra/main.parameters.bicep \
+            --parameters @./infra/main.parameters.json \
               acrName=${{ env.ACR_NAME }} \
               acrResourceGroupName=${{ env.ACR_RESOURCE_GROUP }} \
               imageName=${{ env.IMAGE_NAME }} \
