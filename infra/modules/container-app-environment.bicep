@@ -59,6 +59,12 @@ resource logAnalyticsWorkspace 'Microsoft.OperationalInsights/workspaces@2023-09
   }
 }
 
+// Get Log Analytics workspace shared key using listKeys
+resource logAnalyticsWorkspaceKeys 'Microsoft.OperationalInsights/workspaces@2020-08-01/listKeys' = {
+  name: 'listKeys'
+  parent: logAnalyticsWorkspace
+}
+
 // Container App Environment with VNet integration
 resource containerAppEnvironment 'Microsoft.App/managedEnvironments@2023-05-01' = {
   name: containerAppEnvironmentName
@@ -68,6 +74,7 @@ resource containerAppEnvironment 'Microsoft.App/managedEnvironments@2023-05-01' 
       destination: 'log-analytics'
       logAnalyticsConfiguration: {
         customerId: logAnalyticsWorkspace.properties.customerId
+        sharedKey: logAnalyticsWorkspaceKeys.primarySharedKey
       }
     }
     vnetConfiguration: {
