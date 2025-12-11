@@ -58,7 +58,7 @@ jobs:
       - name: Deploy Bicep template
         run: |
           az deployment sub create \
-            --location eastus \
+            --location eastus2 \
             --template-file ./infra/main.bicep \
             --parameters @./infra/main.parameters.json \
               vnetResourceGroupName=${{ env.VNET_RG }} \

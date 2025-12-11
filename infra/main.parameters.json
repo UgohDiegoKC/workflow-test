@@ -15,7 +15,7 @@
       "value": "workflowtest-rg"
     },
     "location": {
-      "value": "eastus"
+      "value": "eastus2"
     },
     "containerAppEnvironmentName": {
       "value": "cae-test"

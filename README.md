@@ -44,7 +44,7 @@ The infrastructure can be deployed using Azure CLI:
 
 ```bash
 az deployment sub create \
-  --location eastus \
+  --location eastus2 \
   --template-file ./infra/main.bicep \
   --parameters @./infra/main.parameters.json \
     acrName=workflowtest \
