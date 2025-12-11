@@ -9,14 +9,10 @@ param vnetName string
 @description('The name of the subnet for Container Apps')
 param subnetName string
 
-@description('The name of the resource group where the Container App Environment is located')
-param containerAppEnvironmentResourceGroupName string
-
 @description('The name of the Container App Environment')
 param containerAppEnvironmentName string
 
-// Construct resource IDs for cross-resource-group references
-var vnetId = resourceId(vnetResourceGroupName, 'Microsoft.Network/virtualNetworks', vnetName)
+// Construct resource ID for cross-resource-group reference
 var subnetId = resourceId(vnetResourceGroupName, 'Microsoft.Network/virtualNetworks/subnets', vnetName, subnetName)
 
 // Reference to existing Container App Environment (in the same resource group as module scope)

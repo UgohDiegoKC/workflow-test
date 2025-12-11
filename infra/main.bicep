@@ -9,9 +9,6 @@ param vnetName string
 @description('The name of the subnet for Container Apps')
 param subnetName string
 
-@description('The name of the resource group for the Container App Environment and Container App')
-param containerAppEnvironmentResourceGroupName string
-
 @description('The location for all resources')
 param location string
 
@@ -37,8 +34,9 @@ param imageTag string
 param containerPort int
 
 // Reference to existing Container App Environment and Container App resource group
+// Uses the same resource group as ACR
 resource containerAppEnvironmentRg 'Microsoft.Resources/resourceGroups@2021-04-01' existing = {
-  name: containerAppEnvironmentResourceGroupName
+  name: acrResourceGroupName
 }
 
 // Reference existing Container App Environment resources using module
@@ -49,7 +47,6 @@ module containerAppEnvironmentModule 'modules/container-app-environment.bicep' =
     vnetResourceGroupName: vnetResourceGroupName
     vnetName: vnetName
     subnetName: subnetName
-    containerAppEnvironmentResourceGroupName: containerAppEnvironmentResourceGroupName
     containerAppEnvironmentName: containerAppEnvironmentName
   }
 }

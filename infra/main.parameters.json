@@ -11,9 +11,6 @@
     "subnetName": {
       "value": "subnet-containerapps"
     },
-    "containerAppEnvironmentResourceGroupName": {
-      "value": "workflowtest-rg"
-    },
     "location": {
       "value": "eastus2"
     },
