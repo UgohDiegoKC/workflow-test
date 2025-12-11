@@ -11,12 +11,6 @@
     "subnetName": {
       "value": "subnet-containerapps"
     },
-    "logAnalyticsResourceGroupName": {
-      "value": "Vnet-RG"
-    },
-    "logAnalyticsWorkspaceName": {
-      "value": "law-cae-test"
-    },
     "containerAppEnvironmentResourceGroupName": {
       "value": "workflowtest-rg"
     },

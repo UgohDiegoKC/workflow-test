@@ -9,12 +9,6 @@ param vnetName string
 @description('The name of the subnet for Container Apps')
 param subnetName string
 
-@description('The name of the resource group where the Log Analytics Workspace is located')
-param logAnalyticsResourceGroupName string
-
-@description('The name of the Log Analytics Workspace')
-param logAnalyticsWorkspaceName string
-
 @description('The name of the resource group for the Container App Environment and Container App')
 param containerAppEnvironmentResourceGroupName string
 
@@ -55,8 +49,6 @@ module containerAppEnvironmentModule 'modules/container-app-environment.bicep' =
     vnetResourceGroupName: vnetResourceGroupName
     vnetName: vnetName
     subnetName: subnetName
-    logAnalyticsResourceGroupName: logAnalyticsResourceGroupName
-    logAnalyticsWorkspaceName: logAnalyticsWorkspaceName
     containerAppEnvironmentResourceGroupName: containerAppEnvironmentResourceGroupName
     containerAppEnvironmentName: containerAppEnvironmentName
   }
