@@ -51,10 +51,44 @@ module containerAppEnvironmentModule 'modules/container-app-environment.bicep' =
   }
 }
 
-// Deploy Container App resources using module
+// Reference to existing ACR resource group
+resource acrRg 'Microsoft.Resources/resourceGroups@2021-04-01' existing = {
+  name: acrResourceGroupName
+}
+
+// Step 1: Create managed identity first
+module managedIdentityModule 'modules/managed-identity.bicep' = {
+  name: 'managedIdentityDeployment'
+  scope: containerAppEnvironmentRg
+  params: {
+    containerAppName: containerAppName
+    location: location
+  }
+}
+
+// Step 2: Assign AcrPull role to the managed identity (depends on identity creation)
+module acrRoleAssignmentModule 'modules/acr-role-assignment.bicep' = {
+  name: 'acrRoleAssignmentDeployment'
+  scope: acrRg
+  dependsOn: [
+    managedIdentityModule  // Ensure identity exists before role assignment
+  ]
+  params: {
+    acrName: acrName
+    principalId: managedIdentityModule.outputs.identityPrincipalId
+    roleAssignmentNameSeed: '${containerAppEnvironmentRg.id}-${containerAppName}'
+  }
+}
+
+// Step 3: Deploy Container App using existing identity (depends on role assignment)
+// This ensures the role assignment has been created before the Container App tries to pull the image
 module containerAppModule 'modules/container-app.bicep' = {
   name: 'containerAppDeployment'
   scope: containerAppEnvironmentRg
+  dependsOn: [
+    containerAppEnvironmentModule
+    acrRoleAssignmentModule  // Ensure role assignment exists before Container App creation
+  ]
   params: {
     location: location
     containerAppName: containerAppName
@@ -63,22 +97,8 @@ module containerAppModule 'modules/container-app.bicep' = {
     imageName: imageName
     imageTag: imageTag
     containerPort: containerPort
-  }
-}
-
-// Reference to existing ACR resource group
-resource acrRg 'Microsoft.Resources/resourceGroups@2021-04-01' existing = {
-  name: acrResourceGroupName
-}
-
-// Role assignment: AcrPull role for the managed identity on ACR (deployed via module)
-module acrRoleAssignmentModule 'modules/acr-role-assignment.bicep' = {
-  name: 'acrRoleAssignmentDeployment'
-  scope: acrRg
-  params: {
-    acrName: acrName
-    principalId: containerAppModule.outputs.containerAppIdentityPrincipalId
-    roleAssignmentNameSeed: '${containerAppEnvironmentRg.id}-${containerAppName}'
+    managedIdentityId: managedIdentityModule.outputs.identityId
+    managedIdentityPrincipalId: managedIdentityModule.outputs.identityPrincipalId
   }
 }
 
@@ -88,4 +108,5 @@ output containerAppName string = containerAppModule.outputs.containerAppName
 output containerAppFqdn string = containerAppModule.outputs.containerAppFqdn
 output containerAppUrl string = containerAppModule.outputs.containerAppFqdn != '' ? 'https://${containerAppModule.outputs.containerAppFqdn}' : 'Internal endpoint (VNet-only)'
 output vnetName string = containerAppEnvironmentModule.outputs.vnetName
-output containerAppIdentityId string = containerAppModule.outputs.containerAppIdentityId
+output containerAppIdentityId string = managedIdentityModule.outputs.identityId
+output containerAppIdentityPrincipalId string = managedIdentityModule.outputs.identityPrincipalId

@@ -21,10 +21,17 @@ param imageTag string
 @description('The port the container listens on')
 param containerPort int
 
-// User-assigned managed identity for Container App
-resource containerAppIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31' = {
-  name: 'identity-${containerAppName}'
-  location: location
+@description('The resource ID of the existing managed identity')
+param managedIdentityId string
+
+@description('The principal ID of the existing managed identity')
+param managedIdentityPrincipalId string
+
+// Reference to existing managed identity (using resource ID to get name)
+var identityName = last(split(managedIdentityId, '/'))
+
+resource containerAppIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31' existing = {
+  name: identityName
 }
 
 // Container App
@@ -77,5 +84,5 @@ resource containerApp 'Microsoft.App/containerApps@2023-05-01' = {
 output containerAppName string = containerApp.name
 output containerAppFqdn string = containerApp.properties.configuration.ingress.fqdn
 output containerAppIdentityId string = containerAppIdentity.id
-output containerAppIdentityPrincipalId string = containerAppIdentity.properties.principalId
+output containerAppIdentityPrincipalId string = managedIdentityPrincipalId
 
