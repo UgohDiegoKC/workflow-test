@@ -21,29 +21,18 @@ param imageTag string
 @description('The port the container listens on')
 param containerPort int
 
-@description('The resource ID of the existing managed identity')
-param managedIdentityId string
+@description('The Service Principal client ID for ACR authentication')
+@secure()
+param spnClientId string
 
-@description('The principal ID of the existing managed identity')
-param managedIdentityPrincipalId string
-
-// Reference to existing managed identity (using resource ID to get name)
-var identityName = last(split(managedIdentityId, '/'))
-
-resource containerAppIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31' existing = {
-  name: identityName
-}
+@description('The Service Principal client secret for ACR authentication')
+@secure()
+param spnClientSecret string
 
 // Container App
 resource containerApp 'Microsoft.App/containerApps@2023-05-01' = {
   name: containerAppName
   location: location
-  identity: {
-    type: 'UserAssigned'
-    userAssignedIdentities: {
-      '${containerAppIdentity.id}': {}
-    }
-  }
   properties: {
     managedEnvironmentId: containerAppEnvironmentId
     configuration: {
@@ -56,7 +45,14 @@ resource containerApp 'Microsoft.App/containerApps@2023-05-01' = {
       registries: [
         {
           server: '${acrName}.azurecr.io'
-          identity: containerAppIdentity.id
+          username: spnClientId
+          passwordSecretRef: 'acr-password'
+        }
+      ]
+      secrets: [
+        {
+          name: 'acr-password'
+          value: spnClientSecret
         }
       ]
     }
@@ -83,6 +79,4 @@ resource containerApp 'Microsoft.App/containerApps@2023-05-01' = {
 // Outputs
 output containerAppName string = containerApp.name
 output containerAppFqdn string = containerApp.properties.configuration.ingress.fqdn
-output containerAppIdentityId string = containerAppIdentity.id
-output containerAppIdentityPrincipalId string = managedIdentityPrincipalId
 

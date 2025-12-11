@@ -10,20 +10,26 @@ This is a minimal test application for testing the GitHub Actions workflow that 
 - `.github/workflows/deploy-container-app.yml` - GitHub Actions workflow for deploying to Container App
 - `infra/main.bicep` - Main Bicep template orchestrating infrastructure deployment
 - `infra/main.parameters.json` - Bicep parameters file
-- `infra/modules/managed-identity.bicep` - Module for creating user-assigned managed identity
 - `infra/modules/container-app-environment.bicep` - Module for Container App Environment
 - `infra/modules/container-app.bicep` - Module for Container App deployment
-- `infra/modules/acr-role-assignment.bicep` - Module for ACR role assignments
 - `package.json` - Node.js dependencies
 
 ## Infrastructure Deployment
 
 ### Prerequisites
 
-1. Ensure you have the `AZURE_CREDENTIALS` secret configured in your GitHub repository
+1. Ensure you have the `AZURE_CREDENTIALS` secret configured in your GitHub repository with the following JSON format:
+   ```json
+   {
+     "clientSecret": "...",
+     "subscriptionId": "...",
+     "tenantId": "...",
+     "clientId": "..."
+   }
+   ```
 2. Make sure the service principal has the following permissions:
    - `Contributor` role at **subscription level** (for creating resource groups and deploying resources)
-   - `User Access Administrator` role at **subscription level** (for role assignments)
+   - `AcrPull` role on the ACR (for pulling images - already configured)
    - `AcrPush` role on the ACR (for building and pushing images)
 3. The Azure Container Registry (`workflowtest`) must already exist in the `workflowtest-rg` resource group
 
@@ -36,24 +42,25 @@ The infrastructure is deployed at **subscription level** and creates the followi
 
 #### Resources Created:
 - **Container App Environment** (`cae-test`) with **internal VNet integration** (VNet-only access)
-- **User-assigned Managed Identity** (`identity-<containerAppName>`) for Container App authentication
-- **Container App** (`capp-test-new`) configured to use the image from ACR
+- **Container App** (`capp-test-new`) configured to use the image from ACR with Service Principal authentication
 - **Log Analytics Workspace** for monitoring (created as part of Container App Environment)
+
+#### Authentication
+
+The Container App authenticates to Azure Container Registry using the Service Principal from `AZURE_CREDENTIALS`. The SPN's client ID and secret are extracted from the GitHub secret and securely passed to the Bicep template. The SPN must already have the `AcrPull` role assigned on the ACR at the subscription level.
 
 #### Deployment Order
 
-The infrastructure deployment follows a specific order to ensure proper RBAC propagation:
+The infrastructure deployment follows a specific order:
 
 1. **Container App Environment** - Creates the managed environment
-2. **Managed Identity** - Creates the user-assigned identity
-3. **Role Assignment** - Assigns `AcrPull` role to the identity on ACR (depends on identity)
-4. **Container App** - Creates the Container App using the identity (depends on role assignment)
+2. **Container App** - Creates the Container App using Service Principal credentials for ACR authentication
 
-This ordering ensures that the role assignment is in place before the Container App attempts to pull images from ACR, preventing deployment failures due to RBAC propagation delays.
+No managed identity creation or role assignment is needed since the existing SPN from `AZURE_CREDENTIALS` is used directly.
 
 #### Deployment Command
 
-The infrastructure can be deployed using Azure CLI:
+The infrastructure can be deployed using Azure CLI. Note that `spnClientId` and `spnClientSecret` are required parameters (extracted from `AZURE_CREDENTIALS` in the GitHub workflow):
 
 ```bash
 az deployment sub create \
@@ -69,8 +76,12 @@ az deployment sub create \
     acrResourceGroupName=workflowtest-rg \
     imageName=workflow-test-app \
     imageTag=latest \
-    containerAppName=capp-test-new
+    containerAppName=capp-test-new \
+    spnClientId=<SPN_CLIENT_ID> \
+    spnClientSecret=<SPN_CLIENT_SECRET>
 ```
+
+**Note:** When deploying via GitHub Actions, the SPN credentials are automatically extracted from the `AZURE_CREDENTIALS` secret and passed to the deployment.
 
 **Note:** The Container App is configured for **internal VNet access only**. It is not publicly accessible and can only be reached from resources within the VNet or connected via VPN/ExpressRoute.
 
@@ -129,10 +140,11 @@ az deployment sub create \
 
 - Automatically triggers after successful "Build and Push to ACR" workflow
 - Can also be manually triggered with optional image tag parameter
-- Creates Container App Environment, Managed Identity, Role Assignment, and Container App
+- Extracts Service Principal credentials from `AZURE_CREDENTIALS` secret
+- Creates Container App Environment and Container App
 - Deploys/updates the Container App using the specified image from ACR
+- Uses Service Principal authentication for ACR image pulling (no managed identity required)
 - Uses subscription-level Bicep templates with modular architecture for infrastructure deployment
-- Ensures proper deployment order: Identity → Role Assignment → Container App (prevents RBAC propagation issues)
 - Container App is configured for **internal VNet access only** (not publicly accessible)
 
 ## Notes
@@ -140,10 +152,9 @@ az deployment sub create \
 - The build workflow will tag images based on branch and commit SHA
 - Images are pushed to: `workflowtest.azurecr.io/workflow-test-app:<tag>`
 - The build workflow uses Docker Buildx for advanced caching
-- The deployment workflow creates infrastructure resources in the correct order to prevent RBAC propagation issues:
-  1. Managed Identity is created first
-  2. Role Assignment is created and waits for identity
-  3. Container App is created and waits for role assignment
+- The deployment workflow uses the Service Principal from `AZURE_CREDENTIALS` for ACR authentication
+- The SPN's client ID and secret are securely extracted from the GitHub secret and passed to the Bicep template
+- The Service Principal must have the `AcrPull` role on the ACR (configured at subscription level)
 - Container App is configured for **internal VNet access only** - it cannot be accessed from the public internet
 - To access the Container App, you need to be connected to the VNet via:
   - A VM in the same VNet
@@ -151,5 +162,5 @@ az deployment sub create \
   - ExpressRoute connection
   - Azure Bastion or jump host in the VNet
 - The Container App's internal FQDN will be displayed in the deployment workflow summary
-- The managed identity (`identity-<containerAppName>`) is automatically assigned the `AcrPull` role on the ACR to enable image pulling
+- No managed identity is created - the existing Service Principal from `AZURE_CREDENTIALS` is used directly for ACR authentication
 

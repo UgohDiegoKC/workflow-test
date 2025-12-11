@@ -54,6 +54,28 @@ jobs:
           echo "tag=${IMAGE_TAG}" >> $GITHUB_OUTPUT
           echo "Deploying image tag: ${IMAGE_TAG}"
 
+      - name: Extract SPN credentials
+        id: spn-creds
+        run: |
+          # Extract client ID and secret from AZURE_CREDENTIALS JSON secret
+          # Format: {"clientSecret": "...", "subscriptionId": "...", "tenantId": "...", "clientId": "..."}
+          CLIENT_ID=$(echo '${{ secrets.AZURE_CREDENTIALS }}' | jq -r '.clientId')
+          CLIENT_SECRET=$(echo '${{ secrets.AZURE_CREDENTIALS }}' | jq -r '.clientSecret')
+          
+          # Validate that credentials were extracted
+          if [ -z "$CLIENT_ID" ] || [ "$CLIENT_ID" == "null" ]; then
+            echo "Error: Failed to extract clientId from AZURE_CREDENTIALS"
+            exit 1
+          fi
+          if [ -z "$CLIENT_SECRET" ] || [ "$CLIENT_SECRET" == "null" ]; then
+            echo "Error: Failed to extract clientSecret from AZURE_CREDENTIALS"
+            exit 1
+          fi
+          
+          echo "clientId=${CLIENT_ID}" >> $GITHUB_OUTPUT
+          echo "::add-mask::${CLIENT_SECRET}"
+          echo "clientSecret=${CLIENT_SECRET}" >> $GITHUB_OUTPUT
+
       - name: Deploy Bicep template
         run: |
           DEPLOYMENT_NAME="container-app-deployment-$(date +%s)"
@@ -70,7 +92,9 @@ jobs:
               acrResourceGroupName=${{ env.ACR_RESOURCE_GROUP }} \
               imageName=${{ env.IMAGE_NAME }} \
               imageTag=${{ steps.set-tag.outputs.tag }} \
-              containerAppName=${{ env.CONTAINER_APP_NAME }}
+              containerAppName=${{ env.CONTAINER_APP_NAME }} \
+              spnClientId=${{ steps.spn-creds.outputs.clientId }} \
+              spnClientSecret=${{ steps.spn-creds.outputs.clientSecret }}
 
       - name: Get Container App Internal URL
         id: get-url
